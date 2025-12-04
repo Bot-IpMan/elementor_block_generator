@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import ContentEditor from "@/components/ContentEditor";
 import SpacingControls from "@/components/SpacingControls";
 import EffectsControls from "@/components/EffectsControls";
 import BlockPreview from "@/components/BlockPreview";
-import { BlockConfigData } from "../../../drizzle/schema";
+import type { BlockConfigData, TemplateType } from "../../../drizzle/schema";
 
 const TEMPLATE_TYPES = [
   { value: "pricing_card", label: "Pricing Card" },
@@ -81,7 +81,7 @@ const DEFAULT_CONFIG: BlockConfigData = {
 
 export default function Configurator() {
   const [blockName, setBlockName] = useState("My Block");
-  const [templateType, setTemplateType] = useState<string>("pricing_card");
+  const [templateType, setTemplateType] = useState<TemplateType>("pricing_card");
   const [config, setConfig] = useState<BlockConfigData>(DEFAULT_CONFIG);
   const [generatedCode, setGeneratedCode] = useState<{ html: string; css: string } | null>(null);
   const [showCodeModal, setShowCodeModal] = useState(false);
@@ -101,7 +101,7 @@ export default function Configurator() {
   });
 
   // Update generated code when config changes
-  useMemo(() => {
+  useEffect(() => {
     if (generateCodeMutation.data) {
       setGeneratedCode(generateCodeMutation.data);
     }
@@ -170,7 +170,7 @@ export default function Configurator() {
                 {/* Template Type */}
                 <div>
                   <Label htmlFor="templateType">Template Type</Label>
-                  <Select value={templateType} onValueChange={setTemplateType}>
+                  <Select value={templateType} onValueChange={(value) => setTemplateType(value as TemplateType)}>
                     <SelectTrigger id="templateType">
                       <SelectValue />
                     </SelectTrigger>
@@ -234,7 +234,7 @@ export default function Configurator() {
             <Card className="p-6">
               <h2 className="text-xl font-bold mb-4">Live Preview</h2>
               <div className="bg-muted p-6 rounded-lg border border-border min-h-[400px] overflow-auto">
-                <BlockPreview config={config} />
+                <BlockPreview config={config} templateType={templateType} />
               </div>
             </Card>
 
