@@ -1,7 +1,7 @@
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -12,6 +12,7 @@ export function useAuth(options?: UseAuthOptions) {
   const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
     options ?? {};
   const utils = trpc.useUtils();
+  const hasMountedRef = useRef(false);
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
@@ -41,24 +42,43 @@ export function useAuth(options?: UseAuthOptions) {
     }
   }, [logoutMutation, utils]);
 
-  const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
-    return {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Avoid writing to localStorage during the initial render cycle in React 19
+    // which can run effects twice in development. We only sync once the hook
+    // has mounted at least once to prevent update loops triggered by storage
+    // listeners.
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    if (meQuery.data) {
+      localStorage.setItem(
+        "manus-runtime-user-info",
+        JSON.stringify(meQuery.data)
+      );
+    } else {
+      localStorage.removeItem("manus-runtime-user-info");
+    }
+  }, [meQuery.data]);
+
+  const state = useMemo(
+    () => ({
       user: meQuery.data ?? null,
       loading: meQuery.isLoading || logoutMutation.isPending,
       error: meQuery.error ?? logoutMutation.error ?? null,
       isAuthenticated: Boolean(meQuery.data),
-    };
-  }, [
-    meQuery.data,
-    meQuery.error,
-    meQuery.isLoading,
-    logoutMutation.error,
-    logoutMutation.isPending,
-  ]);
+    }),
+    [
+      meQuery.data,
+      meQuery.error,
+      meQuery.isLoading,
+      logoutMutation.error,
+      logoutMutation.isPending,
+    ]
+  );
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
