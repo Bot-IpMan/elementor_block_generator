@@ -21,21 +21,35 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   window.location.href = getLoginUrl();
 };
 
-queryClient.getQueryCache().subscribe(event => {
-  if (event.type === "updated" && event.action.type === "error") {
+let unsubscribeQueryErrors: (() => void) | null = null;
+let unsubscribeMutationErrors: (() => void) | null = null;
+
+const setupErrorSubscriptions = () => {
+  // Guard against duplicate listeners (e.g. after HMR) to avoid
+  // repeatedly firing the same callbacks and creating noisy update loops.
+  unsubscribeQueryErrors?.();
+  unsubscribeMutationErrors?.();
+
+  unsubscribeQueryErrors = queryClient.getQueryCache().subscribe(event => {
+    if (event.type !== "updated" || event.action.type !== "error") return;
+
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
     console.error("[API Query Error]", error);
-  }
-});
+  });
 
-queryClient.getMutationCache().subscribe(event => {
-  if (event.type === "updated" && event.action.type === "error") {
-    const error = event.mutation.state.error;
-    redirectToLoginIfUnauthorized(error);
-    console.error("[API Mutation Error]", error);
-  }
-});
+  unsubscribeMutationErrors = queryClient
+    .getMutationCache()
+    .subscribe(event => {
+      if (event.type !== "updated" || event.action.type !== "error") return;
+
+      const error = event.mutation.state.error;
+      redirectToLoginIfUnauthorized(error);
+      console.error("[API Mutation Error]", error);
+    });
+};
+
+setupErrorSubscriptions();
 
 const trpcClient = trpc.createClient({
   links: [
